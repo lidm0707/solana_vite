@@ -46,6 +46,7 @@ function MainApp() {
   const wallet = useAnchorWallet();
   const [data, setData] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null); // สำหรับข้อความสถานะ
+  const [logMessages, setLogMessages] = useState<string[]>([]); // เก็บข้อความจาก msg!
 
   const program = useMemo(() => {
     if (!publicKey || !connected || !wallet) return null;
@@ -63,18 +64,39 @@ function MainApp() {
 
     try {
       setMessage("Initializing counter...");
-      await program.methods
+      let somedata = await program.methods
         .initialize()
         .accounts({
           user: publicKey, // ใช้ publicKey ของผู้ใช้งาน
         })
         .rpc();
+      console.log(somedata)
       setMessage("Transaction completed successfully!");
     } catch (error) {
       console.error(error);
       setMessage("Error during initialization.");
     }
   };
+
+  useEffect(() => {
+    if (connection && publicKey) {
+      // Explicitly define the type of unsubscribe as a function
+      const unsubscribe = connection.onLogs(
+        publicKey,
+        (logs) => {
+          // ตรวจสอบว่ามีข้อความจาก msg! หรือไม่
+          const newLogs = logs.logs.filter(log => log.includes("Greetings from"));
+          if (newLogs.length > 0) {
+            setLogMessages(prevLogs => [...prevLogs, ...newLogs]);
+          }
+        },
+        "confirmed"
+      );
+  
+      // Ensure unsubscribe is a function and properly called in the cleanup function
+
+    }
+  }, [connection, publicKey]);
 
   return (
     <div className="flex flex-col items-center mx-auto my-6 space-y-4">
@@ -85,6 +107,14 @@ function MainApp() {
       </button>
       {data ? <div>Counter Value: {data}</div> : <div>Loading data...</div>}
       {message && <div className="text-center">{message}</div>} {/* แสดงข้อความ */}
+      {logMessages.length > 0 && (
+        <div>
+          <h2>Program Logs:</h2>
+          {logMessages.map((log, index) => (
+            <div key={index}>{log}</div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
